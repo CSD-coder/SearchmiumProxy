@@ -1,0 +1,13 @@
+{
+  "name": "SearchmiumProxy",
+  "version": "1.0.0",
+  "description": "A proxy called SearchmiumProxy",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "license": "MIT"
+}
