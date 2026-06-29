@@ -122,7 +122,7 @@ function createProxyRequest(targetUrl, method, headers, body, callback, redirect
     method: method,
     headers: requestHeaders,
     timeout: TIMEOUT,
-    rejectUnauthorized: true // Secure in production
+    rejectUnauthorized: true
   };
   
   const proxyReq = httpModule.request(requestOptions, (proxyRes) => {
@@ -159,9 +159,7 @@ function createProxyRequest(targetUrl, method, headers, body, callback, redirect
   proxyReq.end();
 }
 
-// Single request handler for both proxy and health check
 function handleRequest(req, res) {
-  // Parse the URL
   const parsedUrl = url.parse(req.url, true);
   
   // Health check endpoint
@@ -216,7 +214,7 @@ function handleRequest(req, res) {
   // Extract target URL from query parameters
   let targetUrl = parsedUrl.query.url || parsedUrl.query.target || parsedUrl.query.quest;
   
-  // Handle path-based proxy requests (e.g., /proxy/http://example.com)
+  // Handle path-based proxy requests
   if (!targetUrl && parsedUrl.pathname.startsWith('/proxy/')) {
     targetUrl = decodeURIComponent(parsedUrl.pathname.substring(7));
   }
@@ -249,7 +247,6 @@ function handleRequest(req, res) {
   
   console.log(`[PROXY] ${req.method} ${targetUrl} (from ${clientIp})`);
   
-  // Collect request body
   let body = [];
   req.on('data', (chunk) => {
     body.push(chunk);
@@ -269,23 +266,17 @@ function handleRequest(req, res) {
         return;
       }
       
-      // Set CORS headers before copying response headers
       for (const [key, value] of Object.entries(CORS_HEADERS)) {
         proxyRes.headers[key] = value;
       }
       
-      // Copy status and headers
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      
-      // Stream the response
       proxyRes.pipe(res);
       
-      // Log completion
       proxyRes.on('end', () => {
         console.log(`[PROXY COMPLETE] ${targetUrl} - ${proxyRes.statusCode}`);
       });
       
-      // Handle errors during streaming
       proxyRes.on('error', (streamErr) => {
         console.error(`[STREAM ERROR] ${targetUrl}: ${streamErr.message}`);
         if (!res.headersSent) {
@@ -300,19 +291,15 @@ function handleRequest(req, res) {
   });
 }
 
-// Create the server with single request handler
 const server = http.createServer(handleRequest);
 
-// Start listening
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Web Proxy Server running on port ${PORT}`);
   console.log(`Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`Allowed methods: ${ALLOWED_METHODS.join(', ')}`);
-  console.log(`Timeout: ${TIMEOUT}ms`);
   console.log(`Rate limit: ${MAX_REQUESTS_PER_WINDOW} requests/min`);
 });
 
-// Graceful shutdown
 function gracefulShutdown() {
   console.log('Shutting down gracefully...');
   server.close(() => {
@@ -320,7 +307,6 @@ function gracefulShutdown() {
     process.exit(0);
   });
   
-  // Force exit after 10 seconds
   setTimeout(() => {
     console.error('Forced shutdown after timeout');
     process.exit(1);
@@ -330,7 +316,6 @@ function gracefulShutdown() {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-// Error handling
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   gracefulShutdown();
