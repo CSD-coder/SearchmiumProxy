@@ -1,40 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Web Proxy Browser</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SearchmiumProxy/title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="proxy-container">
     <div class="toolbar">
-      <h1>🌐 Web Proxy Browser</h1>
-      <div class="status-bar">
-        <span id="proxyCount">Initializing...</span>
-        <span id="currentProxy">No proxy selected</span>
-        <select id="countrySelect" onchange="updateCountry()">
-          <option value="auto">📍 Auto Location</option>
-          <option value="US">🇺🇸 United States</option>
+      <div class="title-bar">
+        <h1>🌐 Proxy Browser</h1>
+        <div class="proxy-info">
+          <span id="proxyStatus">🔴 No Proxy</span>
+          <span id="proxyLocation">Auto</span>
+        </div>
+      </div>
+      
+      <div class="location-selector">
+        <label>📍 Location:</label>
+        <select id="countrySelect">
+          <option value="auto">Auto (Fastest)</option>
           <option value="GB">🇬🇧 United Kingdom</option>
+          <option value="US">🇺🇸 United States</option>
           <option value="DE">🇩🇪 Germany</option>
           <option value="FR">🇫🇷 France</option>
           <option value="NL">🇳🇱 Netherlands</option>
           <option value="CA">🇨🇦 Canada</option>
         </select>
+        <button id="testProxyBtn" onclick="testCurrentProxy()">🧪 Test</button>
       </div>
+      
       <div class="url-bar">
-        <button onclick="goBack()" title="Go Back">←</button>
-        <button onclick="goForward()" title="Go Forward">→</button>
-        <button onclick="refresh()" title="Refresh">↻</button>
-        <input type="text" id="urlInput" placeholder="Enter URL (e.g., example.com)" />
-        <button onclick="loadSite()" id="goButton">Go</button>
+        <button onclick="goBack()" title="Go Back (Alt+Left)" id="backBtn">◀</button>
+        <button onclick="goForward()" title="Go Forward (Alt+Right)" id="forwardBtn">▶</button>
+        <button onclick="refreshPage()" title="Refresh (F5)" id="refreshBtn">🔄</button>
+        <button onclick="goHome()" title="Home" id="homeBtn">🏠</button>
+        <input type="text" id="urlInput" placeholder="Enter website URL..." autocomplete="off" />
+        <button onclick="loadSite()" id="goButton">▶ Go</button>
+        <button onclick="stopLoading()" id="stopBtn" style="display:none;">⏹ Stop</button>
       </div>
     </div>
+    
     <div class="main-content">
-      <div class="iframe-container">
-        <iframe id="proxyFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-top-navigation"></iframe>
+      <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+          <div id="loadingText">Loading...</div>
+          <div id="loadingUrl"></div>
+        </div>
       </div>
+      
+      <div id="errorOverlay" class="error-overlay" style="display:none;">
+        <div class="error-box">
+          <div class="error-icon">⚠️</div>
+          <h2>Failed to Load Page</h2>
+          <div id="errorUrl"></div>
+          <div id="errorMessage"></div>
+          <button onclick="retryLoad()">🔄 Retry</button>
+          <button onclick="loadSite(document.getElementById('urlInput').value)">🌐 Try Different Proxy</button>
+        </div>
+      </div>
+      
+      <webview id="proxyFrame" style="width:100%; height:100%;"></webview>
     </div>
   </div>
+  
   <script src="script.js"></script>
 </body>
 </html>
