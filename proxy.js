@@ -1,23 +1,9 @@
 const http = require('http');
 const https = require('https');
-const url = require('url');
 const fs = require('fs');
 
 const PORT = process.env.PORT || 3000;
 const TIMEOUT = 30000;
-
-function contentTypeFromUrl(urlStr) {
-  const ext = urlStr.split('.').pop().toLowerCase().split('?')[0];
-  const map = {
-    html: 'text/html', htm: 'text/html', css: 'text/css', js: 'application/javascript',
-    json: 'application/json', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
-    woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf',
-    mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav',
-    pdf: 'application/pdf', xml: 'application/xml', txt: 'text/plain'
-  };
-  return map[ext] || null;
-}
 
 function isValidUrl(urlString) {
   try {
@@ -39,7 +25,6 @@ function rewriteHtml(html, baseUrl) {
     '<head><base href="/?url=' + encodeURIComponent(baseUrl) + '">');
   
   // Rewrite relative URLs to absolute through proxy
-  // href, src, action, srcset
   html = html.replace(/(href|src|action|srcset)=["']([^"']+)["']/gi, (m, attr, val) => {
     val = val.trim();
     // Skip anchors, javascript, mailto, tel, data URIs
@@ -219,8 +204,9 @@ function serveFile(res, filePath) {
 }
 
 const server = http.createServer((req, res) => {
-  const parsed = url.parse(req.url, true);
-  const pathname = parsed.pathname;
+  // Use WHATWG URL API instead of url.parse()
+  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = reqUrl.pathname;
   
   // Serve index.html
   if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
@@ -234,8 +220,24 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // Get target URL
-  let targetUrl = parsed.query.url;
+  // Get target URL from query parameter
+  let targetUrl = reqUrl.searchParams.get('url');
+  
+  // Handle path-based proxy: /proxy/url
+  if (!targetUrl && pathname.startsWith('/proxy/')) {
+    targetUrl = decodeURIComponent(pathname.substring(7));
+  }
+  
+  // Handle referer-based resolution for relative resources
+  if (!targetUrl && req.headers.referer) {
+    try {
+      const refererUrl = new URL(req.headers.referer);
+      const refererTarget = refererUrl.searchParams.get('url');
+      if (refererTarget && pathname !== '/') {
+        targetUrl = new URL(pathname.substring(1), refererTarget).href;
+      }
+    } catch(e) {}
+  }
   
   if (!targetUrl) {
     res.writeHead(400, { 'Content-Type': 'text/html' });
@@ -253,5 +255,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('Proxy server on port ' + PORT);
+  console.log('Proxy server running on port ' + PORT);
 });
