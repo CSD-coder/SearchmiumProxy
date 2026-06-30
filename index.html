@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web Proxy Browser</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="proxy-container">
+    <div class="toolbar">
+      <h1>🌐 Web Proxy Browser</h1>
+      <div class="status-bar">
+        <span id="proxyCount">Initializing...</span>
+        <span id="currentProxy">No proxy selected</span>
+        <select id="countrySelect" onchange="updateCountry()">
+          <option value="auto">📍 Auto Location</option>
+          <option value="US">🇺🇸 United States</option>
+          <option value="GB">🇬🇧 United Kingdom</option>
+          <option value="DE">🇩🇪 Germany</option>
+          <option value="FR">🇫🇷 France</option>
+          <option value="NL">🇳🇱 Netherlands</option>
+          <option value="CA">🇨🇦 Canada</option>
+        </select>
+      </div>
+      <div class="url-bar">
+        <button onclick="goBack()" title="Go Back">←</button>
+        <button onclick="goForward()" title="Go Forward">→</button>
+        <button onclick="refresh()" title="Refresh">↻</button>
+        <input type="text" id="urlInput" placeholder="Enter URL (e.g., example.com)" />
+        <button onclick="loadSite()" id="goButton">Go</button>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="iframe-container">
+        <iframe id="proxyFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-top-navigation"></iframe>
+      </div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
