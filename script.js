@@ -1,4 +1,3 @@
-// Web Proxy Browser - Client Side
 const urlInput = document.getElementById('urlInput');
 const proxyFrame = document.getElementById('proxyFrame');
 const proxyStatus = document.getElementById('proxyStatus');
@@ -16,108 +15,6 @@ const stopBtn = document.getElementById('stopBtn');
 let historyStack = [];
 let currentIndex = -1;
 let isLoading = false;
-let currentAbortController = null;
-let selectedCountry = 'auto';
-let proxyList = [];
-let workingProxies = [];
-
-// CORS Proxy services - these will be used to fetch content
-const CORS_PROXIES = [
-  {
-    name: 'allorigins',
-    url: 'https://api.allorigins.win/raw?url=',
-    type: 'direct'
-  },
-  {
-    name: 'corsproxy',
-    url: 'https://corsproxy.io/?',
-    type: 'query'
-  },
-  {
-    name: 'codetabs',
-    url: 'https://api.codetabs.com/v1/proxy?quest=',
-    type: 'query'
-  }
-];
-
-// Initialize proxies from data files
-async function initializeProxies() {
-  try {
-    const csvProxies = await loadFromCSV();
-    const jsonProxies = await loadFromJSON();
-    const txtProxies = await loadFromTXT();
-    
-    const uniqueProxies = new Set([...csvProxies, ...jsonProxies, ...txtProxies]);
-    proxyList = [...uniqueProxies].filter(p => p.includes('://'));
-    workingProxies = proxyList.filter(p => p.startsWith('socks5://'));
-    
-    updateProxyStatus();
-    return proxyList.length > 0;
-  } catch (error) {
-    console.error('Failed to initialize proxies:', error);
-    return false;
-  }
-}
-
-async function loadFromCSV() {
-  try {
-    const response = await fetch('data.csv');
-    if (!response.ok) return [];
-    const text = await response.text();
-    return text.split('\n')
-      .filter(line => line.trim() && line.includes('://'))
-      .map(line => line.split(',')[0].trim());
-  } catch(e) {
-    console.warn('CSV load failed:', e);
-    return [];
-  }
-}
-
-async function loadFromJSON() {
-  try {
-    const response = await fetch('data.json');
-    if (!response.ok) return [];
-    const data = await response.json();
-    return data.filter(item => item.proxy).map(item => item.proxy.trim());
-  } catch(e) {
-    console.warn('JSON load failed:', e);
-    return [];
-  }
-}
-
-async function loadFromTXT() {
-  try {
-    const response = await fetch('data.txt');
-    if (!response.ok) return [];
-    const text = await response.text();
-    return text.split('\n').map(line => line.trim()).filter(line => line.includes('://'));
-  } catch(e) {
-    console.warn('TXT load failed:', e);
-    return [];
-  }
-}
-
-function updateProxyStatus() {
-  if (proxyList.length > 0) {
-    proxyStatus.textContent = `🟢 ${proxyList.length} Proxies`;
-    proxyStatus.style.color = '#4CAF50';
-  } else {
-    proxyStatus.textContent = '🔴 No Proxies';
-    proxyStatus.style.color = '#f44336';
-  }
-  
-  const countryText = countrySelect.options[countrySelect.selectedIndex].text;
-  proxyLocation.textContent = countryText;
-}
-
-function updateCountry() {
-  selectedCountry = countrySelect.value;
-  proxyLocation.textContent = countrySelect.options[countrySelect.selectedIndex].text;
-  
-  if (historyStack.length > 0 && currentIndex >= 0) {
-    refreshPage();
-  }
-}
 
 function normalizeUrl(url) {
   url = url.trim();
@@ -127,73 +24,21 @@ function normalizeUrl(url) {
   return url;
 }
 
-function getRandomProxy() {
-  const country = selectedCountry;
-  
-  if (country !== 'auto' && proxyList.length > 0) {
-    const countryProxies = proxyList.filter(p => {
-      const proxyData = findProxyData(p);
-      return proxyData && proxyData.country === country;
-    });
-    
-    if (countryProxies.length > 0) {
-      return countryProxies[Math.floor(Math.random() * countryProxies.length)];
-    }
+function getProxyUrl(targetUrl) {
+  // Build proxy URL with optional country parameter
+  let proxyUrl = '/?url=' + encodeURIComponent(targetUrl);
+  const country = countrySelect.value;
+  if (country !== 'auto') {
+    proxyUrl += '&country=' + country;
   }
-  
-  if (workingProxies.length > 0) {
-    return workingProxies[Math.floor(Math.random() * workingProxies.length)];
-  }
-  
-  if (proxyList.length > 0) {
-    return proxyList[Math.floor(Math.random() * proxyList.length)];
-  }
-  
-  return null;
+  return proxyUrl;
 }
 
-function findProxyData(proxyUrl) {
-  // Simple function to extract data from proxy URL
-  // In production, you'd parse the JSON data
-  return null;
-}
-
-async function fetchViaCorsProxy(targetUrl) {
-  // Try each CORS proxy service
-  for (const service of CORS_PROXIES) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
-      const proxyUrl = service.url + encodeURIComponent(targetUrl);
-      
-      const response = await fetch(proxyUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const html = await response.text();
-        if (html.length > 500 && html.includes('<')) {
-          return { success: true, html, serviceUsed: service.name };
-        }
-      }
-    } catch (e) {
-      console.log(`CORS proxy ${service.name} failed:`, e.message);
-      continue;
-    }
-  }
-  
-  return { success: false, html: null, serviceUsed: null };
-}
-
-function showLoading() {
+function showLoading(url) {
   loadingOverlay.style.display = 'flex';
   errorOverlay.style.display = 'none';
+  loadingText.textContent = 'Loading...';
+  loadingUrl.textContent = url;
   goButton.style.display = 'none';
   stopBtn.style.display = 'inline-block';
 }
@@ -208,7 +53,7 @@ function showError(url, message) {
   errorOverlay.style.display = 'flex';
   loadingOverlay.style.display = 'none';
   errorUrl.textContent = url;
-  errorMessage.textContent = message || 'Failed to load the page. Please try again.';
+  errorMessage.textContent = message || 'Failed to load the page.';
   goButton.style.display = 'inline-block';
   stopBtn.style.display = 'none';
 }
@@ -217,84 +62,43 @@ function hideError() {
   errorOverlay.style.display = 'none';
 }
 
+function updateProxyStatus() {
+  const country = countrySelect.options[countrySelect.selectedIndex].text;
+  proxyLocation.textContent = country;
+  proxyStatus.textContent = '🟢 Active';
+  proxyStatus.style.color = '#4CAF50';
+}
+
 async function loadSite(url) {
   if (isLoading) {
-    // Stop current load
     stopLoading();
     return;
   }
-  
+
   const targetUrl = url || urlInput.value;
   if (!targetUrl) return;
-  
+
   const normalizedUrl = normalizeUrl(targetUrl);
   urlInput.value = normalizedUrl;
-  
+
   // Update history
   if (currentIndex < historyStack.length - 1) {
     historyStack = historyStack.slice(0, currentIndex + 1);
   }
   historyStack.push(normalizedUrl);
   currentIndex = historyStack.length - 1;
-  
-  await loadViaProxy(normalizedUrl);
+
+  loadViaProxy(normalizedUrl);
 }
 
-async function loadViaProxy(targetUrl) {
+function loadViaProxy(targetUrl) {
   isLoading = true;
   hideError();
-  showLoading();
-  
-  loadingText.textContent = 'Loading page...';
-  loadingUrl.textContent = targetUrl;
-  
-  // Abort any existing requests
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
-  currentAbortController = new AbortController();
-  
-  try {
-    // Try to fetch via CORS proxy first
-    const result = await fetchViaCorsProxy(targetUrl);
-    
-    if (result.success && result.html) {
-      const processedHtml = processHtml(result.html, targetUrl);
-      
-      // Use srcdoc for iframe (better compatibility than webview)
-      if (proxyFrame.tagName === 'WEBVIEW') {
-        proxyFrame.loadURL(targetUrl);
-      } else {
-        // Create an iframe if webview is not available
-        if (proxyFrame.tagName !== 'IFRAME') {
-          const iframe = document.createElement('iframe');
-          iframe.id = 'proxyFrame';
-          iframe.style.cssText = 'width:100%; height:100%; border:none; background:white;';
-          proxyFrame.parentNode.replaceChild(iframe, proxyFrame);
-          window.proxyFrame = iframe;
-        }
-        
-        proxyFrame.srcdoc = processedHtml;
-      }
-      
-      hideLoading();
-      proxyStatus.textContent = `🟢 Via ${result.serviceUsed}`;
-      proxyStatus.style.color = '#4CAF50';
-      
-      // Update URL input with actual URL (in case of redirects)
-      urlInput.value = targetUrl;
-    } else {
-      // Fallback: try loading directly in iframe
-      tryLoadingDirectly(targetUrl);
-    }
-  } catch (error) {
-    console.error('Loading failed:', error);
-    tryLoadingDirectly(targetUrl);
-  }
-}
+  showLoading(targetUrl);
 
-function tryLoadingDirectly(targetUrl) {
-  // Try loading the URL directly in the iframe as a last resort
+  const proxyUrl = getProxyUrl(targetUrl);
+  
+  // Replace iframe if needed
   if (proxyFrame.tagName !== 'IFRAME') {
     const iframe = document.createElement('iframe');
     iframe.id = 'proxyFrame';
@@ -302,67 +106,51 @@ function tryLoadingDirectly(targetUrl) {
     proxyFrame.parentNode.replaceChild(iframe, proxyFrame);
     window.proxyFrame = iframe;
   }
-  
-  proxyFrame.src = targetUrl;
-  
-  // Set timeout for direct loading
-  const timeoutId = setTimeout(() => {
-    if (isLoading) {
-      showError(targetUrl, 'Page took too long to load. The website may be blocking iframe access.');
-      isLoading = false;
-      hideLoading();
-    }
-  }, 20000);
-  
-  proxyFrame.onload = () => {
-    clearTimeout(timeoutId);
-    if (isLoading) {
-      hideLoading();
-      isLoading = false;
-      proxyStatus.textContent = '🟢 Direct';
-      proxyStatus.style.color = '#4CAF50';
-    }
-  };
-  
-  proxyFrame.onerror = () => {
-    clearTimeout(timeoutId);
-    hideLoading();
-    showError(targetUrl, 'Failed to load page. The website may be blocking iframe access.');
-    isLoading = false;
-  };
-}
 
-function processHtml(html, baseUrl) {
-  // Add base tag if not present
-  if (!html.includes('<base ')) {
-    html = html.replace('<head>', `<head><base href="${baseUrl}">`);
-  }
-  
-  // Convert relative URLs to absolute
-  html = html.replace(/(href|src|action)=["'](?!https?:\/\/|\/\/|data:|#|javascript:|mailto:|tel:)([^"']+)["']/gi,
-    (match, attr, url) => {
+  // Set up load handler
+  proxyFrame.onload = function() {
+    if (isLoading) {
+      isLoading = false;
+      hideLoading();
+      updateProxyStatus();
+      
+      // Update URL from iframe
       try {
-        const absoluteUrl = new URL(url, baseUrl).href;
-        return `${attr}="${absoluteUrl}"`;
-      } catch (e) {
-        return match;
+        const iframeUrl = proxyFrame.contentWindow.location.href;
+        const urlParams = new URL(iframeUrl).searchParams;
+        const actualUrl = urlParams.get('url');
+        if (actualUrl && actualUrl !== urlInput.value) {
+          urlInput.value = actualUrl;
+        }
+      } catch(e) {
+        // Cross-origin - ignore
       }
     }
-  );
-  
-  return html;
+  };
+
+  proxyFrame.onerror = function() {
+    hideLoading();
+    showError(targetUrl, 'Failed to load page. Try a different URL.');
+    isLoading = false;
+  };
+
+  // Load the proxy URL
+  proxyFrame.src = proxyUrl;
+
+  // Timeout
+  setTimeout(() => {
+    if (isLoading) {
+      isLoading = false;
+      hideLoading();
+      showError(targetUrl, 'Page took too long to load.');
+    }
+  }, 30000);
 }
 
 function stopLoading() {
-  if (currentAbortController) {
-    currentAbortController.abort();
-    currentAbortController = null;
-  }
-  
   if (proxyFrame) {
     proxyFrame.src = 'about:blank';
   }
-  
   isLoading = false;
   hideLoading();
   hideError();
@@ -389,7 +177,7 @@ function goForward() {
 function refreshPage() {
   if (isLoading) {
     stopLoading();
-    setTimeout(() => refreshPage(), 500);
+    setTimeout(refreshPage, 500);
     return;
   }
   if (historyStack.length > 0 && currentIndex >= 0) {
@@ -412,22 +200,28 @@ function retryLoad() {
 }
 
 async function testCurrentProxy() {
-  const testUrl = 'https://www.google.com';
   proxyStatus.textContent = '🟡 Testing...';
   proxyStatus.style.color = '#FFC107';
   
   try {
-    const result = await fetchViaCorsProxy(testUrl);
-    if (result.success) {
+    const response = await fetch('/?url=https://www.google.com');
+    if (response.ok) {
       proxyStatus.textContent = '🟢 Working';
       proxyStatus.style.color = '#4CAF50';
     } else {
       proxyStatus.textContent = '🔴 Failed';
       proxyStatus.style.color = '#f44336';
     }
-  } catch (e) {
+  } catch(e) {
     proxyStatus.textContent = '🔴 Error';
     proxyStatus.style.color = '#f44336';
+  }
+}
+
+function updateCountry() {
+  updateProxyStatus();
+  if (historyStack.length > 0 && currentIndex >= 0) {
+    refreshPage();
   }
 }
 
@@ -454,30 +248,21 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// Handle browser back/forward buttons
-window.addEventListener('popstate', function(e) {
-  if (e.state && e.state.index !== undefined) {
-    currentIndex = e.state.index;
-    urlInput.value = historyStack[currentIndex];
-    loadViaProxy(historyStack[currentIndex]);
+// Listen for messages from iframe (for navigation updates)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'navigate') {
+    urlInput.value = e.data.url;
+    loadViaProxy(e.data.url);
   }
 });
 
-// Update history state when navigating
-const originalPushState = history.pushState;
-history.pushState = function() {
-  originalPushState.apply(this, arguments);
-};
-
 // Initialize
-window.addEventListener('DOMContentLoaded', async () => {
-  console.log('🌐 Web Proxy Browser Initializing...');
-  
-  await initializeProxies();
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('🌐 Web Proxy Browser Ready');
   updateProxyStatus();
   
-  // Create initial iframe if webview is not supported
-  if (proxyFrame.tagName === 'WEBVIEW') {
+  // Create iframe
+  if (proxyFrame.tagName !== 'IFRAME') {
     const iframe = document.createElement('iframe');
     iframe.id = 'proxyFrame';
     iframe.style.cssText = 'width:100%; height:100%; border:none; background:white;';
@@ -487,12 +272,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   // Load default page
   urlInput.value = 'https://www.google.com';
-  await loadSite();
-  
-  console.log('✅ Proxy browser ready');
+  loadSite();
 });
 
-// Handle window resize
 window.addEventListener('resize', () => {
   if (proxyFrame) {
     proxyFrame.style.width = '100%';
