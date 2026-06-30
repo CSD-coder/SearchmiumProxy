@@ -1,7 +1,7 @@
 {
   "name": "SearchmiumProxy",
   "version": "1.0.0",
-  "description": "A proxy called SearchmiumProxy",
+  "description": "A very very good web proxy.",
   "main": "proxy.js",
   "scripts": {
     "start": "node proxy.js"
